@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "moonlite",
+  "owner": { "name": "Moonlite Games", "url": "https://github.com/moonlitegames" },
+  "description": "Team tools for shipping browser games to Portals.",
+  "plugins": [
+    { "name": "portals-ship", "source": "./plugins/portals-ship", "description": "One-command deploy: local folder -> Portals draft -> build check -> publish." }
+  ]
+}
