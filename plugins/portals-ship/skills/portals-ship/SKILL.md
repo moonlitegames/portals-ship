@@ -20,6 +20,18 @@ Use the `/portals-ship:ship` command for the guarded, step-by-step version of th
 `scripts/ship.sh` handles the local leg (apply a delivered zip, run tests, commit, push, wait for CI)
 and then hands off to this command.
 
+Field-tested failure modes:
+
+- **`list_web_games` returns zero games** — account mismatch. `authenticate` is a NO-OP while a
+  credential is live (in-memory session wins), and its precedence is: memory → `PORTALS_ACCESS_KEY`
+  env → saved `~/.portals-mcp/auth.json` → interactive browser login. An invalid env key fails
+  SILENTLY into the saved file. Fix: move the stale `~/.portals-mcp/auth.json` aside, reconnect the
+  MCP server (`/mcp`), run `authenticate` again — with nothing saved it opens the browser login and
+  stores fresh credentials. Verify `source: "browser"` or `"env"`, never `"already_authenticated"`.
+- **`INVALID_BUNDLE: ...\.git: secret and credential files`** — the push included a nested git
+  worktree pointer (e.g. under `.claude/worktrees/`). The bundler skips a top-level `.git` only.
+  This is why the ship stages a clean export instead of pushing the working directory.
+
 Common diagnostics: `UNSUPPORTED_THREE_ADDON` — the repo references a managed-runtime add-on module
 (the three add-ons import path) that Portals does not host; their scanner reads comments and vendored
 files too. Remove the reference or vendor the file under a different path. Always report diagnostics verbatim; never edit game code to "make it pass"

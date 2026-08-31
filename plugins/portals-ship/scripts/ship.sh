@@ -17,7 +17,7 @@ if [ -n "$ZIP" ]; then
   TMP="$(mktemp -d)"; unzip -q "$ZIP" -d "$TMP"
   SRC="$(find "$TMP" -maxdepth 2 -name index.html -exec dirname {} \; | head -1)"
   [ -n "$SRC" ] || { echo "zip has no index.html"; exit 1; }
-  rsync -a --delete --exclude .git "$SRC/" ./
+  rsync -a --delete --exclude .git --exclude .claude "$SRC/" ./
   rm -rf "$TMP"; echo "mirrored $ZIP"
 fi
 

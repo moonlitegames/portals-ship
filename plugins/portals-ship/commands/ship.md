@@ -12,9 +12,10 @@ optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--me
 0. Local leg (only when `--zip <path>` is given): mirror the delivered zip into this folder, then
    commit and push. Use the shell, one step at a time, showing each command:
      rm -rf /tmp/ship-src && mkdir -p /tmp/ship-src && unzip -q "<path>" -d /tmp/ship-src
-     rsync -a --delete --exclude .git "<the extracted folder that contains index.html>/" ./
-   If the repo has `./sync-build.sh`, prefer running it with the build number instead (it does the
-   mirror, test, commit and push in one go). Otherwise, after the mirror and tests: `git add -A`,
+     rsync -a --delete --exclude .git --exclude .claude "<the extracted folder that contains index.html>/" ./
+   (`.claude/` may hold live git worktrees and local settings — deleting it corrupts them.)
+   If the repo has `./sync-build.sh`, prefer running it with the build number instead (it mirrors,
+   runs the tests, commits and pushes in one go, and refuses to commit on a red suite). Otherwise, after the mirror and tests: `git add -A`,
    `git commit -m "<label>"`, `git push` (skip all git steps with `--no-git`). If the `gh` CLI is
    available, wait for the latest GitHub Actions run to finish (`gh run watch --exit-status`) and
    stop if it is red.
@@ -24,8 +25,17 @@ optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--me
    script and `--skip-tests` was not given (and it was not already run by sync-build.sh), run
    `npm test` and abort on failure, quoting the failing lines.
 3. Call `list_web_games`; select the game whose name matches `.portals-ship.json` (case-insensitive).
-   If none matches, stop and list the names you found.
-4. Call `push_web_game_source` with the working directory and `tag` = the label if one was given.
+   If none matches, stop and list the names you found. If it returns ZERO games, that is an account
+   mismatch (the saved credential is not the account that owns the game): explain it, point the user
+   at re-authenticating (the `authenticate` tool with the owning account's access key, or
+   `PORTALS_ACCESS_KEY`), and never create a game to work around it.
+4. Stage a clean export and push THAT — never the live working directory (it carries `.claude/`
+   worktrees whose nested `.git` pointer files trip Portals' secret/credential scanner, plus
+   `.DS_Store` and other local noise):
+     EXPORT="$(mktemp -d)/game"
+     rsync -a --exclude .git --exclude .claude --exclude node_modules --exclude _tmp --exclude __pycache__ --exclude .DS_Store ./ "$EXPORT/"
+   Call `push_web_game_source` with that export directory and `tag` = the label if one was given,
+   then remove the temp directory after the push (success or failure).
    - If the tool returns build diagnostics or a rejection (e.g. UNSUPPORTED_THREE_ADDON), stop and
      report the diagnostic verbatim with the file it names. Do not proceed to publish.
    - Otherwise report the returned `share_url` (playable draft) and keep the `revision`.
