@@ -48,6 +48,17 @@ prints the command to run.
 Actions (needs the `gh` CLI), then invokes the Claude Code command headlessly. Add `--draft` to
 push a playable draft without publishing. Any build diagnostic stops the ship and is reported verbatim.
 
+## Notes from live runs
+
+- A local-path marketplace references the repo in place (it is not copied), so plugin updates that
+  arrive with a game build are live at source immediately — run `/reload-plugins` to refresh the
+  wording mid-session.
+- CI must be resolved by commit SHA, never `--limit 1` right after a push (false-green risk; the
+  ship command now does this).
+- If the auto-permission classifier blocks `./sync-build.sh`, either let Claude run its steps
+  explicitly (documented alternative) or add a permission rule for it (e.g. allow
+  `Bash(./sync-build.sh:*)` via /permissions) for unattended runs.
+
 ## Cowork
 
 The same command runs in Claude Cowork once the Portals MCP server is added to Claude Desktop's

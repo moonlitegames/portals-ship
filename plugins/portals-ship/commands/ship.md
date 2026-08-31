@@ -17,8 +17,10 @@ optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--me
    If the repo has `./sync-build.sh`, prefer running it with the build number instead (it mirrors,
    runs the tests, commits and pushes in one go, and refuses to commit on a red suite). Otherwise, after the mirror and tests: `git add -A`,
    `git commit -m "<label>"`, `git push` (skip all git steps with `--no-git`). If the `gh` CLI is
-   available, wait for the latest GitHub Actions run to finish (`gh run watch --exit-status`) and
-   stop if it is red.
+   available, wait for CI — but NEVER watch "the latest run" blindly: immediately after a push,
+   `gh run list --limit 1` can return the PREVIOUS commit's completed run (a false green). Resolve
+   the run for THIS commit (`gh run list --commit "$(git rev-parse HEAD)"`, polling briefly until it
+   appears), then `gh run watch <that id> --exit-status`, and stop if it is red.
 1. Read `.portals-ship.json` in the working directory if present: `{ "game": "<name>", "multiplayer": false|{...} }`.
    If absent, ask which game to target before doing anything else.
 2. Preflight: the folder must contain `index.html` at its root. If `package.json` has a `test`
