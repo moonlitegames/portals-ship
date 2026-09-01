@@ -17,6 +17,12 @@ if [ -n "$ZIP" ]; then
   TMP="$(mktemp -d)"; unzip -q "$ZIP" -d "$TMP"
   SRC="$(find "$TMP" -maxdepth 2 -name index.html -exec dirname {} \; | head -1)"
   [ -n "$SRC" ] || { echo "zip has no index.html"; exit 1; }
+  # never mirror an older or equal build over the repo (a code-built repo needs no --zip at all)
+  ZIP_BUILD="$(grep -oE 'BUILD *= *[0-9]+' "$SRC/js/config/Version.js" 2>/dev/null | grep -oE '[0-9]+' | head -1)"
+  REPO_BUILD="$(grep -oE 'BUILD *= *[0-9]+' js/config/Version.js 2>/dev/null | grep -oE '[0-9]+' | head -1)"
+  if [ -z "$ZIP_BUILD" ] || [ -z "$REPO_BUILD" ] || [ "$ZIP_BUILD" -le "$REPO_BUILD" ]; then
+    echo "zip is Build ${ZIP_BUILD:-?}, repo is Build ${REPO_BUILD:-?} — refusing to mirror"; rm -rf "$TMP"; exit 1
+  fi
   rsync -a --delete --exclude .git --exclude .claude "$SRC/" ./
   rm -rf "$TMP"; echo "mirrored $ZIP"
 fi
