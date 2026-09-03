@@ -1,63 +1,99 @@
-# portals-ship — one-command Portals deploys for the whole team
+# portals-ship — one-command Portals deploys from Claude Code
 
-Portals' web uploader makes updates painful ("delete the game and redo it"). Their official
-MCP does not: it pushes a folder as a new draft revision, reports build diagnostics, and publishes
-that exact revision. This plugin wraps that into one guarded command, plus a script for the git/CI leg.
+Portals' web uploader makes updates painful ("delete the game and redo it"). The official
+Portals MCP does not: it pushes a folder as a new draft revision, reports build diagnostics,
+and publishes that exact revision. This plugin wraps that into one guarded command for any
+Claude Code project, plus a script for the local git/CI leg.
 
-## Validate before publishing the marketplace
+    /portals-ship:ship "1.4.0"            # tests -> commit/push -> CI -> draft -> diagnostics -> publish
+    /portals-ship:ship "1.4.0" --draft    # stop at the playable draft link
 
-    claude plugin validate tools/portals-ship      # from the game repo, or `.` from the marketplace root
+## Requirements
+
+- A **git repository** for the game (the command commits and pushes the release; `--no-git` opts out).
+- **Claude Code** with the **official Portals plugin** installed, and its `portals-web-games` MCP
+  server **authenticated as the account that owns the game** (`list_web_games` must show it).
+- `index.html` at the root of the folder you ship (for a bundler project that is `dist/` or
+  `build/` after the build — run it from there or point the command at it).
+- Optional: Node 18+ when the project has an `npm test` script (it is honored automatically), and
+  the `gh` CLI when the repo runs GitHub Actions (the ship waits for the run of the pushed commit).
 
 ## Install (each teammate, once)
 
     claude plugin marketplace add portals-labs/portals-plugin-claude
-    claude plugin install portals-plugin-claude@portals          # the official Portals tools
-    claude plugin marketplace add moonlitegames/portals-ship     # this repo (or a local path)
+    claude plugin install portals-plugin-claude@portals          # the official Portals tools + MCP
+    claude plugin marketplace add moonlitegames/portals-ship     # this repo (or a local path to a clone)
     claude plugin install portals-ship@moonlite
 
-Requires Node 18+ and a Portals account signed in through the official plugin.
+Then, in the game folder, tell Claude Code to `authenticate` with Portals once (browser login) and
+check that `list_web_games` lists the game. Validate a local clone before publishing changes to the
+marketplace with `claude plugin validate .` from the repo root.
 
-## Per game (once)
+## Per project (once): `.portals-ship.json`
 
-Put `.portals-ship.json` in the game folder:
+Put `.portals-ship.json` in the folder you ship from:
 
     {
-      "game": "The Search For the Moonlite Princess",
-      "multiplayer": false,
+      "game": "My Game",                                   // listing title, matched case-insensitively
+      "gameId": "g921ecf5bdb3fd9fb62bcdcc0",               // optional: the exact id from list_web_games (wins over the name)
+      "multiplayer": false,                                // or { "maxPlayers": 8, "mode": "coop" } — set only when you confirm
       "featuredImage": "assets/marketing/cover_1600x900.jpg",
       "gallery": ["assets/marketing/shots/01.jpg", "assets/marketing/shots/trailer.mp4"]
     }
 
-Featured image: JPEG/PNG/WebP up to 10 MB (Portals sets no pixel size; their cards are landscape,
-so ~16:9 fits every surface). Gallery: up to 8 items, at most 1 video, images ≤10 MB, video ≤100 MB.
-Add `--media` to a ship to upload them; they're skipped otherwise so covers aren't re-sent every build.
+| key | meaning |
+| --- | --- |
+| `game` | The game's title on Portals. Required unless `gameId` is given; the command stops and lists what it found if nothing matches. |
+| `gameId` | Optional. The `game_id` from `list_web_games`. Use it when two games share a title or you rename the listing. |
+| `multiplayer` | `false` for single-player, or an object with `maxPlayers` and `mode`. Only applied to the listing when you confirm during a ship. |
+| `featuredImage` | Path (relative to the folder) to the cover: JPEG/PNG/WebP up to 10 MB. Portals cards are landscape, so ~16:9 fits every surface. |
+| `gallery` | Up to 8 paths, at most 1 video: images ≤10 MB, video (MP4/WebM) ≤100 MB. Replaces the whole gallery, in order. |
 
-## Every release — one line in Claude Code, from the game folder
+Media is uploaded only when a ship passes `--media`, so covers are not re-sent on every build.
+Without the file, the command asks which game to target before doing anything else.
 
-    /portals-ship:ship "Build 36" --zip ~/Downloads/moonlite-grove.zip
+## Every release
 
-Claude mirrors the zip (via ./sync-build.sh when the repo has one), runs the tests, commits and
-pushes, waits for GitHub Actions if `gh` is installed, pushes the folder to Portals as a draft,
-reports any build diagnostic verbatim, and publishes that revision. Without `--zip` it ships the
-folder as-is. `--draft` pushes a playable draft without publishing.
+From the game folder in Claude Code:
 
-No Claude Code? `scripts/ship.sh "Build 36" --zip ~/Downloads/game.zip` does the local leg and
-prints the command to run.
+    /portals-ship:ship "<label>" [--zip <path>] [--draft] [--media] [--skip-tests] [--no-git] [--no-ci]
 
-`ship.sh` mirrors an optional delivered zip, runs `npm test`, commits, pushes, waits for GitHub
-Actions (needs the `gh` CLI), then invokes the Claude Code command headlessly. Add `--draft` to
-push a playable draft without publishing. Any build diagnostic stops the ship and is reported verbatim.
+| flag | effect |
+| --- | --- |
+| `--zip <path>` | Mirror a delivered zip into the folder first (`rsync --delete`, keeping `.git` and `.claude`), then commit and push. If the repo has `./sync-build.sh`, it is used instead. |
+| `--draft` | Push the playable draft and stop; nothing is published. |
+| `--media` | Upload the cover and gallery declared in `.portals-ship.json`. |
+| `--skip-tests` | Do not run `npm test` (the default runs it whenever `package.json` has a `test` script). |
+| `--no-git` | Skip the commit/push leg entirely (a folder that is not a repo, or a release already pushed). |
+| `--no-ci` | Skip waiting for GitHub Actions (no CI on the repo, or `gh` unavailable). |
+
+The command runs the tests, commits and pushes, waits for the CI run of **that commit** (never
+"the latest run", which can be the previous commit's green), pushes the folder to Portals as a
+draft, reports any build diagnostic verbatim and stops on it, then publishes exactly that
+revision. The label becomes the draft tag and the release tag.
+
+Projects without tests or CI: pass `--skip-tests` and `--no-ci`, or simply have no `test` script
+and no Actions workflow — both legs are skipped automatically when absent.
+
+### No Claude Code on the machine?
+
+`scripts/ship.sh "<label>" [--zip path] [--draft] [--skip-tests] [--no-git] [--no-ci]` does the
+local leg (mirror an optional zip, `npm test`, commit, push, wait for CI) and then invokes the
+command headlessly when `claude` is on the PATH, or prints the command to run.
 
 ## Notes from live runs
 
-- A local-path marketplace references the repo in place (it is not copied), so plugin updates that
-  arrive with a game build are live at source immediately — run `/reload-plugins` to refresh the
-  wording mid-session.
-- CI must be resolved by commit SHA, never `--limit 1` right after a push (false-green risk; the
-  ship command now does this).
-- If the auto-permission classifier blocks `./sync-build.sh`, either let Claude run its steps
-  explicitly (documented alternative) or add a permission rule for it (e.g. allow
-  `Bash(./sync-build.sh:*)` via /permissions) for unattended runs.
+- A local-path marketplace references the clone in place (it is not copied), so edits are live at
+  source immediately — run `/reload-plugins` to refresh the wording mid-session.
+- Ship from a **clean export** when the repo holds Claude Code worktrees under `.claude/`: the
+  bundler's credential scanner rejects a nested `.git` pointer file. `rsync -a --exclude .git
+  --exclude .claude --exclude node_modules ./ "$EXPORT/"` and push that folder.
+- CI must be resolved by commit SHA. `gh run list --limit 1` right after a push can return the
+  previous commit's completed run.
+- If the auto-permission classifier blocks a project script such as `./sync-build.sh`, let Claude
+  run its steps explicitly or add a permission rule for it (e.g. allow `Bash(./sync-build.sh:*)`).
+- `list_web_games` returning zero games is an account mismatch, not an empty account: see the
+  skill's field notes on Portals auth precedence.
 
 ## Cowork
 

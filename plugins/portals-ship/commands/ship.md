@@ -7,7 +7,7 @@ You are shipping the browser game in the current working directory to Portals us
 and stop at the first failure — never "fix" the game silently.
 
 Arguments: $ARGUMENTS — an optional release label (e.g. "Build 36"), optional `--zip <path>`,
-optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--media` (upload the cover + gallery declared in .portals-ship.json).
+optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--no-ci` (skip the GitHub Actions wait), optional `--media` (upload the cover + gallery declared in .portals-ship.json).
 
 0. Local leg (only when `--zip <path>` is given): mirror the delivered zip into this folder, then
    commit and push. Use the shell, one step at a time, showing each command:
@@ -17,17 +17,17 @@ optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--me
    If the repo has `./sync-build.sh`, prefer running it with the build number instead (it mirrors,
    runs the tests, commits and pushes in one go, and refuses to commit on a red suite). Otherwise, after the mirror and tests: `git add -A`,
    `git commit -m "<label>"`, `git push` (skip all git steps with `--no-git`). If the `gh` CLI is
-   available, wait for CI — but NEVER watch "the latest run" blindly: immediately after a push,
+   available (and `--no-ci` was not given), wait for CI — but NEVER watch "the latest run" blindly: immediately after a push,
    `gh run list --limit 1` can return the PREVIOUS commit's completed run (a false green). Resolve
    the run for THIS commit (`gh run list --commit "$(git rev-parse HEAD)"`, polling briefly until it
    appears), then `gh run watch <that id> --exit-status`, and stop if it is red.
-1. Read `.portals-ship.json` in the working directory if present: `{ "game": "<name>", "multiplayer": false|{...} }`.
+1. Read `.portals-ship.json` in the working directory if present: `{ "game": "<name>", "gameId"?: "<id>", "multiplayer": false|{...} }`.
    If absent, ask which game to target before doing anything else.
 2. Preflight: the folder must contain `index.html` at its root. If `package.json` has a `test`
    script and `--skip-tests` was not given (and it was not already run by sync-build.sh), run
    `npm test` and abort on failure, quoting the failing lines.
-3. Call `list_web_games`; select the game whose name matches `.portals-ship.json` (case-insensitive).
-   If none matches, stop and list the names you found. If it returns ZERO games, that is an account
+3. Call `list_web_games`; if `.portals-ship.json` has `gameId`, select that id; otherwise select the
+   game whose name matches `game` (case-insensitive). If none matches, stop and list the names you found. If it returns ZERO games, that is an account
    mismatch (the saved credential is not the account that owns the game): explain it, point the user
    at re-authenticating (the `authenticate` tool with the owning account's access key, or
    `PORTALS_ACCESS_KEY`), and never create a game to work around it.
