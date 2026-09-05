@@ -98,7 +98,8 @@ command headlessly when `claude` is on the PATH, or prints the command to run.
   source immediately — run `/reload-plugins` to refresh the wording mid-session.
 - Ship from a **clean export** when the repo holds Claude Code worktrees under `.claude/`: the
   bundler's credential scanner rejects a nested `.git` pointer file. `rsync -a --exclude .git
-  --exclude .claude --exclude node_modules ./ "$EXPORT/"` and push that folder.
+  --exclude .claude --exclude node_modules --exclude docs/ledger ./ "$EXPORT/"` and push that
+  folder (`docs/ledger` = Look Ledger manifests and contact sheets; captures are never in the repo).
 - CI must be resolved by commit SHA. `gh run list --limit 1` right after a push can return the
   previous commit's completed run.
 - If the auto-permission classifier blocks a project script such as `./sync-build.sh`, let Claude
