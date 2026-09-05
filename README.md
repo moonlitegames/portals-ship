@@ -75,6 +75,17 @@ revision. The label becomes the draft tag and the release tag.
 Projects without tests or CI: pass `--skip-tests` and `--no-ci`, or simply have no `test` script
 and no Actions workflow — both legs are skipped automatically when absent.
 
+### After a publish: tag the version
+
+A publish is not done until the version is tagged and pushed. After a successful publish the
+command prints the exact line with the real values and stops — tags are a creator's action:
+
+    git tag -a v<version> <sha> -m "<label>" && git push origin v<version>
+
+If the project ships a `tools/check-ship.mjs` (moonlite-grove does), the command runs
+`node tools/check-ship.mjs --publish` before publishing and stops when the last published
+version is untagged or its tag is not reachable from HEAD. Drafts are never blocked.
+
 ### No Claude Code on the machine?
 
 `scripts/ship.sh "<label>" [--zip path] [--draft] [--skip-tests] [--no-git] [--no-ci]` does the
@@ -94,6 +105,12 @@ command headlessly when `claude` is on the PATH, or prints the command to run.
   run its steps explicitly or add a permission rule for it (e.g. allow `Bash(./sync-build.sh:*)`).
 - `list_web_games` returning zero games is an account mismatch, not an empty account: see the
   skill's field notes on Portals auth precedence.
+
+## Versioning
+
+`plugins/portals-ship/.claude-plugin/plugin.json` carries the plugin version (semver). Bump the
+minor version when the command's steps or output change (teammates see it on `/reload-plugins`),
+the patch version for wording. Tag the repo `v<version>` to match.
 
 ## Cowork
 

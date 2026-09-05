@@ -42,14 +42,21 @@ optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--no
      report the diagnostic verbatim with the file it names. Do not proceed to publish.
    - Otherwise report the returned `share_url` (playable draft) and keep the `revision`.
 5. If `--draft` was given, stop here: print the share_url and "draft only — not published".
-6. Otherwise call `publish_web_game` with `expectedRevision` = that revision (and the tag only if the
+6. Otherwise, if the folder has `tools/check-ship.mjs`, run `node tools/check-ship.mjs --publish`
+   first and stop on a non-zero exit (its one line names the missing version tag — the last
+   published version must be tagged before the next one ships). Then call `publish_web_game` with `expectedRevision` = that revision (and the tag only if the
    user wants the release named differently). If the server reports `PROJECT_CHANGED`, stop and explain
    that the remote moved and needs reconciling.
 6b. Listing media (only when `--media` was given): if `.portals-ship.json` has `featuredImage`
    and/or `gallery` (paths relative to the working directory), call `update_web_game_settings` with
    `featuredImagePath` and `galleryPaths` (gallery REPLACES the whole gallery, in order — max 8 items,
    at most 1 video; images ≤10 MB, video ≤100 MB, JPEG/PNG/WebP/MP4/WebM). Report what was set.
-7. Report: label, revision, draft share_url, and the published game link. If `update_web_game_settings`
+7. Report: label, revision, draft share_url, and the published game link. After a successful
+   publish, print the exact tag line with the real values — the published `version` from the
+   publish result, the shipped commit (`git rev-parse --short HEAD` of the folder you pushed) and
+   the label — and say the creator runs it (a publish is not done until the version is tagged and
+   pushed; never run it yourself, tags are a creator's action):
+     git tag -a v<version> <sha> -m "<label>" && git push origin v<version> If `update_web_game_settings`
    reports missing publishing requirements (e.g. player support not declared), state them; set
    `multiplayer` from `.portals-ship.json` only when the user confirms.
 

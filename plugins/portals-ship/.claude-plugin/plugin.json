@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "portals-ship",
   "displayName": "Portals Ship",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Ship a Portals web game from the current folder: push source, verify the build, publish. Requires the official portals-plugin-claude.",
   "author": { "name": "Moonlite Games" },
   "keywords": ["portals", "deploy", "publish", "browser-games"]
