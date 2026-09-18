@@ -21,8 +21,11 @@ optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--no
    `gh run list --limit 1` can return the PREVIOUS commit's completed run (a false green). Resolve
    the run for THIS commit (`gh run list --commit "$(git rev-parse HEAD)"`, polling briefly until it
    appears), then `gh run watch <that id> --exit-status`, and stop if it is red.
-1. Read `.portals-ship.json` in the working directory if present: `{ "game": "<name>", "gameId"?: "<id>", "multiplayer": false|{...} }`.
-   If absent, ask which game to target before doing anything else.
+1. Read `.portals-ship.json` in the working directory if present: `{ "game": "<name>", "gameId"?: "<id>", "multiplayer": false|{...}, "exclude"?: [...], "include"?: [...] }`.
+   If absent, ask which game to target before doing anything else. `exclude` adds extra paths on top of
+   the built-in export excludes (`.git .claude node_modules _tmp __pycache__ .DS_Store`); `include`, when
+   present, exports ONLY those paths instead of the whole folder (excludes still apply inside them) —
+   use it for a repo whose folder holds docs, tools, or notes that should not go public (see step 4).
 2. Preflight: the folder must contain `index.html` at its root. If `package.json` has a `test`
    script and `--skip-tests` was not given (and it was not already run by sync-build.sh), run
    `npm test` and abort on failure, quoting the failing lines.
@@ -33,11 +36,20 @@ optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--no
    `PORTALS_ACCESS_KEY`), and never create a game to work around it.
 4. Stage a clean export and push THAT — never the live working directory (it carries `.claude/`
    worktrees whose nested `.git` pointer files trip Portals' secret/credential scanner, plus
-   `.DS_Store` and other local noise):
-     EXPORT="$(mktemp -d)/game"
-     rsync -a --exclude .git --exclude .claude --exclude node_modules --exclude _tmp --exclude __pycache__ --exclude .DS_Store ./ "$EXPORT/"
-   Call `push_web_game_source` with that export directory and `tag` = the label if one was given,
-   then remove the temp directory after the push (success or failure).
+   `.DS_Store` and other local noise). Run the plugin's export script and use the path it prints —
+   it is the one source of truth for what an export excludes, applies `.portals-ship.json`'s
+   `exclude`/`include`, and refuses to hand back anything that still has `.git`/`.claude` in it or
+   is missing `index.html`:
+     EXPORT="$("${CLAUDE_PLUGIN_ROOT}/scripts/export.sh")"
+   Call `push_web_game_source` with `$EXPORT` and `tag` = the label if one was given, then
+   `rm -rf` the directory `export.sh` printed (its parent temp dir) after the push (success or
+   failure). A PreToolUse hook also independently refuses the push if the directory it's given
+   still contains `.git` or `.claude` — treat that block as a bug in how `$EXPORT` was built, not
+   something to work around.
+   - Note what the export script printed to stderr (the manifest): everything in it becomes
+     downloadable by any player from the game's origin the moment this push lands. If the folder
+     holds docs, tools, or design notes alongside the game, that's a sign to add an `include` key
+     to `.portals-ship.json` (step 1) rather than ship the whole tree.
    - If the tool returns build diagnostics or a rejection (e.g. UNSUPPORTED_THREE_ADDON), stop and
      report the diagnostic verbatim with the file it names. Do not proceed to publish.
    - Otherwise report the returned `share_url` (playable draft) and keep the `revision`.

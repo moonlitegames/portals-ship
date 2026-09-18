@@ -30,9 +30,19 @@ Field-tested failure modes:
   stores fresh credentials. Verify `source: "browser"` or `"env"`, never `"already_authenticated"`.
 - **`INVALID_BUNDLE: ...\.git: secret and credential files`** — the push included a nested git
   worktree pointer (e.g. under `.claude/worktrees/`). The bundler skips a top-level `.git` only.
-  This is why the ship stages a clean export instead of pushing the working directory.
+  This is machine-enforced now, not just a step to remember: `scripts/export.sh` builds the clean
+  export (and self-checks it), and a plugin `PreToolUse` hook independently refuses
+  `push_web_game_source` for any directory that still has `.git` or `.claude` in it — so pushing
+  the raw working directory fails closed instead of silently reaching Portals' scanner.
 
 Common diagnostics: `UNSUPPORTED_THREE_ADDON` — the repo references a managed-runtime add-on module
 (the three add-ons import path) that Portals does not host; their scanner reads comments and vendored
 files too. Remove the reference or vendor the file under a different path. Always report diagnostics verbatim; never edit game code to "make it pass"
 unless the user asks.
+
+**Everything in the export is public.** Portals serves exactly what `push_web_game_source` uploads
+— there is no server-side filter for "internal" files. A stray docs `.md` file has been fetched
+with a plain 200 straight from a live game's origin. `export.sh` prints a manifest to stderr on
+every run precisely so this is visible before the push happens; if a project's folder holds docs,
+tools, or notes it shouldn't publish, set `"include"` in `.portals-ship.json` to the runtime paths
+only, rather than relying on `exclude` to enumerate everything that shouldn't ship.

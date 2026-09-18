@@ -38,7 +38,9 @@ Put `.portals-ship.json` in the folder you ship from:
       "gameId": "g921ecf5bdb3fd9fb62bcdcc0",               // optional: the exact id from list_web_games (wins over the name)
       "multiplayer": false,                                // or { "maxPlayers": 8, "mode": "coop" } — set only when you confirm
       "featuredImage": "assets/marketing/cover_1600x900.jpg",
-      "gallery": ["assets/marketing/shots/01.jpg", "assets/marketing/shots/trailer.mp4"]
+      "gallery": ["assets/marketing/shots/01.jpg", "assets/marketing/shots/trailer.mp4"],
+      "exclude": ["docs/ledger"],
+      "include": ["index.html", "js", "styles.css", "assets"]
     }
 
 | key | meaning |
@@ -48,9 +50,22 @@ Put `.portals-ship.json` in the folder you ship from:
 | `multiplayer` | `false` for single-player, or an object with `maxPlayers` and `mode`. Only applied to the listing when you confirm during a ship. |
 | `featuredImage` | Path (relative to the folder) to the cover: JPEG/PNG/WebP up to 10 MB. Portals cards are landscape, so ~16:9 fits every surface. |
 | `gallery` | Up to 8 paths, at most 1 video: images ≤10 MB, video (MP4/WebM) ≤100 MB. Replaces the whole gallery, in order. |
+| `exclude` | Extra paths to leave out of the export, on top of the built-in `.git .claude node_modules _tmp __pycache__ .DS_Store`. |
+| `include` | When present, the export contains ONLY these paths (structure preserved) instead of the whole folder — see "What ships is public", below. |
 
 Media is uploaded only when a ship passes `--media`, so covers are not re-sent on every build.
 Without the file, the command asks which game to target before doing anything else.
+
+### What ships is public
+
+**Every file in the export is downloadable by any player from the game's origin** — this isn't
+theoretical: a stray docs `.md` file has been fetched with a plain 200 from a live game's URL.
+Portals hosts exactly what `push_web_game_source` uploads; there is no server-side allowlist of
+"the parts players should see." If your repo's folder holds design docs, internal tools, model
+sources, or notes alongside the shippable game, add an `include` key to `.portals-ship.json`
+listing only the runtime paths (e.g. `["index.html", "js", "styles.css", "assets"]`) so the export
+never contains them in the first place — `exclude` alone only helps for noise you're certain has no
+sibling worth publishing.
 
 ## Every release
 
@@ -96,10 +111,13 @@ command headlessly when `claude` is on the PATH, or prints the command to run.
 
 - A local-path marketplace references the clone in place (it is not copied), so edits are live at
   source immediately — run `/reload-plugins` to refresh the wording mid-session.
-- Ship from a **clean export** when the repo holds Claude Code worktrees under `.claude/`: the
-  bundler's credential scanner rejects a nested `.git` pointer file. `rsync -a --exclude .git
-  --exclude .claude --exclude node_modules --exclude docs/ledger ./ "$EXPORT/"` and push that
-  folder (`docs/ledger` = Look Ledger manifests and contact sheets; captures are never in the repo).
+- Ship from a **clean export**, always, when the repo holds Claude Code worktrees under `.claude/`:
+  the bundler's credential scanner rejects a nested `.git` pointer file. `scripts/export.sh` is the
+  one place this exclude list lives — the ship command runs it and pushes only the path it prints,
+  and a plugin `PreToolUse` hook independently refuses `push_web_game_source` for any directory
+  that still contains `.git` or `.claude`, so a working-directory push can't slip through even if a
+  session skips the step. Use `.portals-ship.json`'s `exclude`/`include` (above) for anything
+  project-specific — don't hand-roll a substitute rsync call.
 - CI must be resolved by commit SHA. `gh run list --limit 1` right after a push can return the
   previous commit's completed run.
 - If the auto-permission classifier blocks a project script such as `./sync-build.sh`, let Claude

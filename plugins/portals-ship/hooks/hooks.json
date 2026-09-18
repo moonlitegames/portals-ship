@@ -1,0 +1,17 @@
+{
+  "description": "Refuse to push a directory that still carries .git or .claude — a clean export must pass through scripts/export.sh first.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "push_web_game_source$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/guard-clean-export.sh"]
+          }
+        ]
+      }
+    ]
+  }
+}

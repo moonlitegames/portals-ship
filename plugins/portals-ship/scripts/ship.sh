@@ -32,11 +32,17 @@ if [ -z "$SKIP_TESTS" ] && [ -f package.json ] && grep -q '"test"' package.json;
   tail -3 /tmp/ship-test.log
 fi
 
-if [ -z "$NO_GIT" ] && [ -d .git ]; then
-  git add -A; git commit -qm "${LABEL:-ship}" || true; git push
+if [ -z "$NO_GIT" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git add -A; git commit -qm "${LABEL:-ship}" || true; git push -u origin HEAD
   if [ -z "$NO_CI" ] && command -v gh >/dev/null 2>&1; then
-    echo "== waiting for CI"; sleep 8
-    RUN="$(gh run list --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
+    echo "== waiting for CI"
+    SHA="$(git rev-parse HEAD)"
+    RUN=""
+    for _ in $(seq 1 15); do
+      RUN="$(gh run list --commit "$SHA" --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
+      [ -n "$RUN" ] && break
+      sleep 2
+    done
     if [ -n "$RUN" ]; then gh run watch "$RUN" --exit-status || { echo "CI red — not shipping"; exit 1; }; fi
   fi
 fi
