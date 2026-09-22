@@ -41,6 +41,10 @@ optional `--draft`, optional `--skip-tests`, optional `--no-git`, optional `--no
    `exclude`/`include`, and refuses to hand back anything that still has `.git`/`.claude` in it or
    is missing `index.html`:
      EXPORT="$("${CLAUDE_PLUGIN_ROOT}/scripts/export.sh")"
+     [ -n "$EXPORT" ] && [ -d "$EXPORT" ] || { echo "export failed"; exit 1; }
+   The export script prints nothing on stdout when it refuses (the reason goes to stderr), so an
+   empty or missing `$EXPORT` means the export failed: stop and report "export failed" with that
+   stderr reason — never call `push_web_game_source` with an empty directory.
    Call `push_web_game_source` with `$EXPORT` and `tag` = the label if one was given, then
    `rm -rf` the directory `export.sh` printed (its parent temp dir) after the push (success or
    failure). A PreToolUse hook also independently refuses the push if the directory it's given
